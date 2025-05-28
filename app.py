@@ -169,7 +169,6 @@ class BotMasterApp(QtWidgets.QWidget):
         container_layout.addLayout(content_layout)
         main_layout.addWidget(self.container)
 
-        # Установим главную страницу как активную
         self.stack.setCurrentWidget(self.pages["Главная"])
         self.menu_buttons["Главная"].setChecked(True)
         self.current_button = self.menu_buttons["Главная"]
