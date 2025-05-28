@@ -1,0 +1,5 @@
+PyQt5
+pyautogui
+keyboard
+pygetwindow
+vgamepad
