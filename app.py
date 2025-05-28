@@ -21,6 +21,7 @@ class BotMasterApp(QtWidgets.QWidget):
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
 
         self.drag_pos = None
+        self.current_button = None
         self.initUI()
 
     def initUI(self):
@@ -40,7 +41,7 @@ class BotMasterApp(QtWidgets.QWidget):
         self.title_bar.setFixedHeight(40)
         self.title_bar.setStyleSheet("background-color: rgba(18, 18, 20, 220); border-top-left-radius: 20px; border-top-right-radius: 20px;")
         title_bar_layout = QtWidgets.QHBoxLayout(self.title_bar)
-        title_bar_layout.setContentsMargins(17, 0,17, 0)
+        title_bar_layout.setContentsMargins(17, 0, 17, 0)
 
         icon_label = QtWidgets.QLabel()
         pixmap = QtGui.QPixmap("icon.png")
@@ -60,7 +61,6 @@ class BotMasterApp(QtWidgets.QWidget):
         title_container.setLayout(title_with_icon)
 
         title_bar_layout.addWidget(title_container)
-
         title_bar_layout.addStretch()
 
         minimize_btn = QtWidgets.QPushButton("-")
@@ -114,21 +114,31 @@ class BotMasterApp(QtWidgets.QWidget):
         for name, emoji, page_class, enabled in features:
             btn = QtWidgets.QPushButton(f"{emoji} {name}")
             btn.setFixedHeight(40)
+            btn.setCheckable(True)
+            btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
             self.menu_buttons[name] = btn
 
             if enabled:
-                btn.setStyleSheet("""QPushButton {
-                    background-color: #444;
+                btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #2e2e2e;
                     color: white;
                     border: none;
                     border-radius: 10px;
                     font-size: 14px;
-                    padding: 5px;
+                    text-align: left;
+                    padding-left: 15px;
                 }
                 QPushButton:hover {
-                    background-color: #666;
+                    background-color: #444;
+                }
+                QPushButton:checked {
+                    background-color: #2e2e2e;
+                    border-left: 4px solid green;
+                    border-radius: 10px;
+                    padding-left: 11px;
                 }""")
-                btn.clicked.connect(self.make_tab_switcher(name))
+                btn.clicked.connect(self.make_tab_switcher(name, btn))
             else:
                 btn.setEnabled(False)
                 btn.setStyleSheet("""QPushButton {
@@ -137,7 +147,8 @@ class BotMasterApp(QtWidgets.QWidget):
                     border: none;
                     border-radius: 10px;
                     font-size: 14px;
-                    padding: 5px;
+                    text-align: left;
+                    padding-left: 15px;
                 }""")
 
             menu_layout.addWidget(btn)
@@ -158,7 +169,10 @@ class BotMasterApp(QtWidgets.QWidget):
         container_layout.addLayout(content_layout)
         main_layout.addWidget(self.container)
 
+        # Установим главную страницу как активную
         self.stack.setCurrentWidget(self.pages["Главная"])
+        self.menu_buttons["Главная"].setChecked(True)
+        self.current_button = self.menu_buttons["Главная"]
 
     def title_mouse_press(self, event):
         if event.button() == QtCore.Qt.LeftButton:
@@ -170,9 +184,13 @@ class BotMasterApp(QtWidgets.QWidget):
             self.move(event.globalPos() - self.drag_pos)
             event.accept()
 
-    def make_tab_switcher(self, name):
+    def make_tab_switcher(self, name, button):
         def switch_tab():
             self.stack.setCurrentWidget(self.pages[name])
+            if self.current_button and self.current_button != button:
+                self.current_button.setChecked(False)
+            button.setChecked(True)
+            self.current_button = button
         return switch_tab
 
 if __name__ == "__main__":
@@ -181,4 +199,3 @@ if __name__ == "__main__":
     window = BotMasterApp()
     window.show()
     sys.exit(app.exec_())
-
