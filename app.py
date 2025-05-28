@@ -134,7 +134,7 @@ class BotMasterApp(QtWidgets.QWidget):
                 }
                 QPushButton:checked {
                     background-color: #2e2e2e;
-                    border-left: 4px solid green;
+                    border-left: 4px solid #00aaff;
                     border-radius: 10px;
                     padding-left: 11px;
                 }""")
