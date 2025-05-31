@@ -9,6 +9,7 @@ from pages.anti_afk_page import AntiAfkPage
 from pages.stroyka_page import StroykaPage
 from pages.tokar_page import TokarPage
 from pages.shveika_page import ShveikaPage
+from pages.gotovka_page import GotovkaPage
 
 class BotMasterApp(QtWidgets.QWidget):
     def __init__(self):
@@ -107,6 +108,7 @@ class BotMasterApp(QtWidgets.QWidget):
             ("Шахта", "⛏️", SimplePage, False),
             ("Коровы", "🐄", SimplePage, False),
             ("Анти-АФК", "🎯", AntiAfkPage, True),
+            ("Кулинария", "ХУЙ", GotovkaPage, True),
         ]
 
         self.pages = {}
