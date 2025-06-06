@@ -5,7 +5,7 @@ import pyautogui
 import time
 import keyboard
 import os
-
+from widgets.logger import CommonLogger
 
 class GotovkaPage(QtWidgets.QWidget):
     def __init__(self):
@@ -67,14 +67,7 @@ class GotovkaWorker(QtCore.QThread):
         self._running = False
 
     def log(self, message: str):
-        timestamp = time.strftime("[%H:%M:%S]")
-        full_message = f"{timestamp} {message}"
-        try:
-            with open("logs.txt", "a", encoding="utf-8") as f:
-                f.write(full_message + "\n")
-        except OSError:
-            pass
-        self.log_signal.emit(full_message)
+        CommonLogger.log(message, self.log_signal)
 
     def _is_rage_mp_active(self) -> bool:
         active = gw.getActiveWindow()
@@ -115,7 +108,7 @@ class GotovkaWorker(QtCore.QThread):
 
         try:
             while self._running:
-                if not self._is_rage_mp_active():
+                if not CommonLogger.is_rage_mp_active():
                     self.log("Окно RAGE Multiplayer не активно. Ожидание...")
                     time.sleep(1)
                     continue

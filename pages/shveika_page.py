@@ -6,6 +6,7 @@ import traceback
 import pyautogui
 from pyautogui import ImageNotFoundException
 import keyboard
+from widgets.logger import CommonLogger
 
 class ShveikaPage(QtWidgets.QWidget):
     def __init__(self):
@@ -79,28 +80,13 @@ class ShveikaWorker(QtCore.QThread):
         ]
 
     def log(self, message: str):
-        timestamp = time.strftime("[%H:%M:%S]")
-        full_message = f"{timestamp} {message}"
-        try:
-            with open("logs.txt", "a", encoding="utf-8") as fp:
-                fp.write(full_message + "\n")
-        except OSError:
-            pass
-        self.log_signal.emit(full_message)
+        CommonLogger.log(message, self.log_signal)
 
     def stop(self):
         self.running = False
 
     def safe_locate_center(self, path: str):
-        try:
-            return pyautogui.locateCenterOnScreen(path, confidence=self.CONFIDENCE)
-        except pyautogui.ImageNotFoundException:
-            # Просто вернём None — это нормальная ситуация, не надо логировать
-            return None
-        except Exception:
-            # Только неожиданные ошибки логируем
-            self.log(f"[Ошибка] locate {os.path.basename(path)}: {traceback.format_exc()}")
-            return None
+        return CommonLogger.safe_locate_center(path, self.CONFIDENCE, self.log_signal)
 
 
     def run(self):

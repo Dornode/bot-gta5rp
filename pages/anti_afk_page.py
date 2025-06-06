@@ -3,6 +3,7 @@ from PyQt5 import QtWidgets, QtCore
 import random
 import time
 import vgamepad as vg
+from widgets.logger import CommonLogger
 
 class AntiAfkPage(QtWidgets.QWidget):
     def __init__(self):
@@ -91,19 +92,19 @@ class AntiAfkPage(QtWidgets.QWidget):
         return """
             QSlider::groove:horizontal {
                 border: none;
-                height: 4px; /* Увеличиваем высоту канавки */
+                height: 4px;
                 background: #ccc;
-                border-radius: 20px; /* Можно увеличить радиус, чтобы соответствовать высоте */
+                border-radius: 20px;
             }
 
             QSlider::sub-page:horizontal {
                 background: #007aff;
-                border-radius: 6px; /* Соответствие канавке */
+                border-radius: 6px;
             }
 
             QSlider::add-page:horizontal {
                 background: #ccc;
-                border-radius: 6px; /* Соответствие канавке */
+                border-radius: 6px;
             }
 
             QSlider::handle:horizontal {
@@ -218,9 +219,5 @@ class AntiAfkWorker(QtCore.QThread):
             self.gamepad.left_joystick(x_value=0, y_value=0)
             self.gamepad.update()
 
-    def log(self, message):
-        timestamp = time.strftime("[%H:%M:%S]")
-        full_message = f"{timestamp} {message}"
-        with open("logs.txt", "a", encoding="utf-8") as f:
-            f.write(full_message + "\n")
-        self.log_signal.emit(full_message)
+    def log(self, message: str):
+        CommonLogger.log(message, self.log_signal)

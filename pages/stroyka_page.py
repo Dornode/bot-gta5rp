@@ -1,138 +1,132 @@
 from PyQt5 import QtWidgets, QtCore
 from widgets.switch_button import SwitchButton
+from widgets.logger import CommonLogger
 import os
 import time
-import traceback
-import pyautogui
 import keyboard
-from pyautogui import ImageNotFoundException
-
 
 class StroykaPage(QtWidgets.QWidget):
-    """GUI‑страница «Стройка Авто‑Спам»."""
-
     def __init__(self):
         super().__init__()
-        self.worker: StroykaWorker | None = None
+        self.worker = None
         self._init_ui()
-
-    # ---------------- UI ---------------- #
-    @staticmethod
-    def _make_label(text: str, size: int) -> QtWidgets.QLabel:
-        lbl = QtWidgets.QLabel(text)
-        lbl.setStyleSheet(f"color:white;font-size:{size}px;")
-        return lbl
 
     def _init_ui(self):
         lay = QtWidgets.QVBoxLayout(self)
 
         head = QtWidgets.QHBoxLayout()
-        head.addWidget(self._make_label("Стройка Авто‑Спам", 16))
+        head.addWidget(CommonLogger._make_label("Стройка | Шахта", 16))
         head.addStretch()
-        self.switch = SwitchButton(); self.switch.clicked.connect(self._toggle)
+        self.switch = SwitchButton()
+        self.switch.clicked.connect(self._toggle)
         head.addWidget(self.switch)
         lay.addLayout(head)
 
-        self.counter = self._make_label("Счётчик: 0", 14)
-        lay.addWidget(self.counter); lay.addStretch()
+        self.counter = CommonLogger._make_label("Счётчик: 0", 14)
+        lay.addWidget(self.counter)
+        lay.addStretch()
 
         self.log_field = QtWidgets.QTextEdit(readOnly=True)
         self.log_field.setStyleSheet("background:#000;color:#fff;font-family:monospace;")
         self.log_field.setFixedHeight(240)
         lay.addWidget(self.log_field)
 
-    # ------------- slots -------------- #
     def _toggle(self, checked: bool):
         if checked:
-            self.log_field.clear()
-            self.worker = StroykaWorker()
-            self.worker.log_signal.connect(self.log_field.append)
-            self.worker.counter_signal.connect(lambda v: self.counter.setText(f"Счётчик: {v}"))
-            self.worker.start()
+            self._start_worker()
         else:
-            if self.worker:
-                self.worker.stop(); self.worker.wait(); self.worker = None
-            self.log_field.append("[■] Скрипт остановлен.")
-            self.switch.setChecked(False)
+            self._stop_worker()
+
+    def _start_worker(self):
+        self.log_field.clear()
+        self.worker = StroykaWorker()
+        self.worker.log_signal.connect(self.log_field.append)
+        self.worker.counter_signal.connect(self._update_counter)
+        self.worker.start()
+
+    def _stop_worker(self):
+        if self.worker:
+            self.worker.stop()
+            self.worker.wait()
+            self.worker = None
+        self.log_field.append("[■] Скрипт остановлен.")
+        self.switch.setChecked(False)
+
+    def _update_counter(self, value: int):
+        self.counter.setText(f"Счётчик: {value}")
 
 
 class StroykaWorker(QtCore.QThread):
-    """Поток: ищет 3 картинки, спамит клавиши и пишет лог в GUI + файл."""
-
     log_signal = QtCore.pyqtSignal(str)
     counter_signal = QtCore.pyqtSignal(int)
 
     CONFIDENCE = 0.95
-    SPAM_DELAY = 0.03
-    LOOP_SLEEP = 0.10
 
     def __init__(self):
         super().__init__()
-        self.running = True; self.count = 0
+        self.running = False
+        self.count = 0
+        self.img_key = self._load_image_mappings()
+        self._shown = {p: False for p in self.img_key}
+        self._visible = {p: False for p in self.img_key}
 
-        try: import cv2; self.cv2_ok = True
-        except ImportError: self.cv2_ok = False
 
+    def _load_image_mappings(self) -> dict:
         base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.img_key = {
+        return {
             os.path.join(base, "assets", "stroyka", "image1.png"): "e",
             os.path.join(base, "assets", "stroyka", "image2.png"): "y",
             os.path.join(base, "assets", "stroyka", "image3.png"): "f",
         }
-        self._shown = {p: False for p in self.img_key}
-        self._visible = {p: False for p in self.img_key}
 
-    # ---------- util log (ваша версия) ---------- #
     def log(self, message: str):
-        timestamp = time.strftime("[%H:%M:%S]")
-        full_message = f"{timestamp} {message}"
-        try:
-            with open("logs.txt", "a", encoding="utf-8") as fp:
-                fp.write(full_message + "\n")
-        except OSError:
-            pass  # если файл недоступен – выводим только в GUI
-        self.log_signal.emit(full_message)
+        CommonLogger.log(message, self.log_signal)
 
-    # -------- безопасный поиск -------- #
     def safe_locate(self, path: str):
-        try:
-            return pyautogui.locateOnScreen(path, confidence=self.CONFIDENCE)
-        except ImageNotFoundException:
-            return None
-        except Exception:
-            self.log(f"[Ошибка] locate {os.path.basename(path)}:\n{traceback.format_exc()}")
-            return None
+        return CommonLogger.safe_locate(path, self.CONFIDENCE, self.log_signal)
 
     def stop(self):
         self.running = False
 
-    # ------------- run ------------- #
     def run(self):
-        if not self.cv2_ok:
-            self.log("[Ошибка] OpenCV не установлен."); return
-        for p in self.img_key:
-            if not os.path.exists(p):
-                self.log(f"[Ошибка] Файл не найден: {p}"); return
+        self.running = True
+        self.log("Поиск начат.")
 
-        self.log("Скрипт запущен.")
         try:
             while self.running:
-                for path, key in self.img_key.items():
-                    name = os.path.basename(path)
-                    if self.safe_locate(path):
-                        if not self._visible[path]:
-                            self._visible[path] = True; self._shown[path] = False
-                            self.count += 1; self.counter_signal.emit(self.count)
-                            self.log(f"[✓] Найдено {name} → спам '{key}'")
-                        while self.running and self.safe_locate(path):
-                            keyboard.press_and_release(key); time.sleep(self.SPAM_DELAY)
-                        self._visible[path] = False
-                    else:
-                        self._visible[path] = False
-                        if not self._shown[path]:
-                            self.log(f"Ищу {name} (conf={self.CONFIDENCE})"); self._shown[path] = True
-                time.sleep(self.LOOP_SLEEP)
-        except Exception:
-            self.log(f"[Критическая ошибка]\n{traceback.format_exc()}")
+                self._process_images()
+                time.sleep(0.10)
+        except Exception as e:
+            self.log(f"[Критическая ошибка]\n{str(e)}")
         finally:
             self.running = False
+
+    def _process_images(self):
+        for path, key in self.img_key.items():
+            name = os.path.basename(path)
+
+            if self.safe_locate(path):
+                self._handle_visible_image(path, key, name)
+            else:
+                self._handle_missing_image(path, name)
+
+    def _handle_visible_image(self, path: str, key: str, name: str):
+        if not self._visible[path]:
+            self._visible[path] = True
+            self._shown[path] = False
+            self.count += 1
+            self.counter_signal.emit(self.count)
+            self.log(f"[✓] Найдено → спам '{key}'")
+
+        while self.running and self.safe_locate(path):
+            #keyboard.press(key)
+            #time.sleep(0.01)
+            keyboard.press_and_release(key)
+            time.sleep(0.03)
+
+        self._visible[path] = False
+
+    def _handle_missing_image(self, path: str, name: str):
+        self._visible[path] = False
+        if not self._shown[path]:
+            self._shown[path] = True

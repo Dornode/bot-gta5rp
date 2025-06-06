@@ -4,7 +4,7 @@ import time
 import keyboard
 import pygetwindow as gw
 import pyautogui
-
+from widgets.logger import CommonLogger
 
 
 class PortPage(QtWidgets.QWidget):
@@ -17,39 +17,34 @@ class PortPage(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout(self)
 
         switch_layout = QtWidgets.QHBoxLayout()
-        label = QtWidgets.QLabel("Авто‑Порт")
-        label.setStyleSheet("color: white; font-size: 16px;background: none;")
         self.switch = SwitchButton()
         self.switch.clicked.connect(self.toggle_script)
 
-        switch_layout.addWidget(label)
+        switch_layout.addWidget(CommonLogger._make_label("Порт", 16))
         switch_layout.addStretch()
         switch_layout.addWidget(self.switch)
         layout.addLayout(switch_layout)
 
         hotkey_layout = QtWidgets.QHBoxLayout()
-        hotkey_label = QtWidgets.QLabel("Горячая клавиша:")
-        hotkey_label.setStyleSheet("color: white; font-size: 14px;background: none;")
         self.hotkey_input = QtWidgets.QLineEdit("f5")
         self.hotkey_input.setMaxLength(20)
         self.hotkey_input.setFixedWidth(100)
         self.hotkey_input.setStyleSheet("background-color: #222; color: white;")
-        hotkey_layout.addWidget(hotkey_label)
+        
+        hotkey_layout.addWidget(CommonLogger._make_label("Горячая клавиша:", 14))
         hotkey_layout.addWidget(self.hotkey_input)
         hotkey_layout.addStretch()
-
-        hotkey_description = QtWidgets.QLabel("— включить/выключить Shift+W")
+        layout.addLayout(hotkey_layout)
+        
+        hotkey_description = QtWidgets.QLabel("— вкл/выкл Shift+W")
         hotkey_description.setStyleSheet("color: white; font-size: 12px; padding-right:150px;background: none;")
         hotkey_layout.addWidget(hotkey_description)
-        layout.addLayout(hotkey_layout)
-
+        
         self.counter_label = QtWidgets.QLabel("Счётчик: 0")
         self.counter_label.setStyleSheet("color: white; font-size: 14px;background: none;")
         layout.addWidget(self.counter_label)
-
-
         layout.addStretch()
-
+        
         self.log_output = QtWidgets.QTextEdit()
         self.log_output.setReadOnly(True)
         self.log_output.setStyleSheet("background-color: black; color: white; font-family: monospace;")
@@ -103,14 +98,7 @@ class PortWorker(QtCore.QThread):
         keyboard.add_hotkey(self.hotkey, self._request_toggle_move)
 
     def log(self, message: str):
-        timestamp = time.strftime("[%H:%M:%S]")
-        full_message = f"{timestamp} {message}"
-        try:
-            with open("logs.txt", "a", encoding="utf-8") as fp:
-                fp.write(full_message + "\n")
-        except OSError:
-            pass
-        self.log_signal.emit(full_message)
+        CommonLogger.log(message, self.log_signal)
 
     def stop(self):
         self._running = False
@@ -128,24 +116,12 @@ class PortWorker(QtCore.QThread):
     def _is_color_close(c1: tuple[int, int, int], c2: tuple[int, int, int], tol: int) -> bool:
         return all(abs(a - b) <= tol for a, b in zip(c1, c2))
 
-    @staticmethod
-    def _is_rage_mp_active() -> bool:
-        active = gw.getActiveWindow()
-        if not active:
-            return False
-        replacements = {
-            "а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "у": "y", "х": "x",
-            "м": "m", "т": "t", "н": "h", "в": "b", "к": "k",
-        }
-        normalized = "".join(replacements.get(ch, ch) for ch in active.title.casefold())
-        return "multi" in normalized
-
     def run(self):
         self.log("Скрипт запущен. Нажми ESC для остановки или используй переключатель.")
         rage_window_missing = True
         try:
             while self._running:
-                if not self._is_rage_mp_active():
+                if not CommonLogger.is_rage_mp_active():
                     if self._move_enabled:
                         keyboard.release("shift")
                         keyboard.release("w")
@@ -198,7 +174,7 @@ class PortWorker(QtCore.QThread):
 
                 if found:
                     self._count += 1
-                    self.log(f"[✓] Найдена красная полоска на зелёном — нажимаем E (#{self._count})")
+                    self.log(f"[✓] Найдена мини-игра — нажимаем E (#{self._count})")
                     self.counter_signal.emit(self._count)
                     keyboard.press_and_release("e")
                     time.sleep(0.5)
