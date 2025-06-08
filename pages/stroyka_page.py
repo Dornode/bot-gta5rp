@@ -26,10 +26,7 @@ class StroykaPage(QtWidgets.QWidget):
         lay.addWidget(self.counter)
         lay.addStretch()
 
-        self.log_field = QtWidgets.QTextEdit(readOnly=True)
-        self.log_field.setStyleSheet("background:#000;color:#fff;font-family:monospace;")
-        self.log_field.setFixedHeight(240)
-        lay.addWidget(self.log_field)
+        self.log_field = CommonLogger.create_log_field(lay)
 
     def _toggle(self, checked: bool):
         if checked:
@@ -119,9 +116,11 @@ class StroykaWorker(QtCore.QThread):
             self.log(f"[✓] Найдено → спам '{key}'")
 
         while self.running and self.safe_locate(path):
-            #keyboard.press(key)
-            #time.sleep(0.01)
-            keyboard.press_and_release(key)
+            if key == "f":
+                keyboard.send(key)
+            else:
+                keyboard.press_and_release(key)
+                
             time.sleep(0.03)
 
         self._visible[path] = False
