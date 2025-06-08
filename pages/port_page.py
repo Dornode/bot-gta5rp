@@ -45,11 +45,7 @@ class PortPage(QtWidgets.QWidget):
         layout.addWidget(self.counter_label)
         layout.addStretch()
         
-        self.log_output = QtWidgets.QTextEdit()
-        self.log_output.setReadOnly(True)
-        self.log_output.setStyleSheet("background-color: black; color: white; font-family: monospace;")
-        self.log_output.setFixedHeight(200)
-        layout.addWidget(self.log_output)
+        self.log_output = CommonLogger.create_log_field(layout)
 
     def toggle_script(self, checked: bool):
         if checked:

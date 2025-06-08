@@ -75,3 +75,13 @@ class CommonLogger:
         lbl = QtWidgets.QLabel(text)
         lbl.setStyleSheet(f"background:none;color:white;font-size:{size}px;")
         return lbl
+        
+        
+    @staticmethod
+    def create_log_field(layout):
+        log_field = QtWidgets.QTextEdit()
+        log_field.setReadOnly(True)
+        log_field.setStyleSheet("background-color: black; color: white; font-family: monospace;")
+        log_field.setFixedHeight(240)
+        layout.addWidget(log_field)
+        return log_field

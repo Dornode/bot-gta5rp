@@ -17,23 +17,44 @@ class GotovkaPage(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout(self)
 
         switch_layout = QtWidgets.QHBoxLayout()
-        label = QtWidgets.QLabel("Готовка")
-        label.setStyleSheet("color: white; font-size: 16px;background: none;")
         self.switch = SwitchButton()
         self.switch.clicked.connect(self.toggle_script)
 
-        switch_layout.addWidget(label)
+        switch_layout.addWidget(CommonLogger._make_label("Готовка", 16))
         switch_layout.addStretch()
         switch_layout.addWidget(self.switch)
         layout.addLayout(switch_layout)
 
-        layout.addStretch()
+        dish_layout = QtWidgets.QHBoxLayout()
+        dish_label = QtWidgets.QLabel("Выберите блюдо:")
+        dish_label.setStyleSheet("color: white; font-size: 14px; background: none;")
 
-        self.log_output = QtWidgets.QTextEdit()
-        self.log_output.setReadOnly(True)
-        self.log_output.setStyleSheet("background-color: black; color: white; font-family: monospace;")
-        self.log_output.setFixedHeight(200)
-        layout.addWidget(self.log_output)
+        self.dish_combo = QtWidgets.QComboBox()
+        self.dish_combo.addItems(["Фруктовое смузи", "хуй"])
+        self.dish_combo.setStyle(QtWidgets.QStyleFactory.create("Fusion"))
+        self.dish_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #333;
+                color: white;
+                border: 1px solid #555;
+                border-radius: 4px;
+                min-width: 120px;
+                
+            }
+
+            QComboBox QAbstractItemView {
+                background-color: #333;
+                color: white;
+            }
+        """)
+
+        dish_layout.addWidget(dish_label)
+        dish_layout.addWidget(self.dish_combo)
+        dish_layout.addStretch()
+        layout.addLayout(dish_layout)
+
+        layout.addStretch()
+        self.log_output = CommonLogger.create_log_field(layout)
 
     def toggle_script(self, checked: bool):
         if checked:
@@ -69,17 +90,6 @@ class GotovkaWorker(QtCore.QThread):
     def log(self, message: str):
         CommonLogger.log(message, self.log_signal)
 
-    def _is_rage_mp_active(self) -> bool:
-        active = gw.getActiveWindow()
-        if not active:
-            return False
-        replacements = {
-            "а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "у": "y", "х": "x",
-            "м": "m", "т": "t", "н": "h", "в": "b", "к": "k",
-        }
-        normalized = "".join(replacements.get(ch, ch) for ch in active.title.casefold())
-        return "multi" in normalized
-
     def _drag_image(self, image_path, offset_x, offset_y):
         location = pyautogui.locateCenterOnScreen(image_path, confidence=0.85)
         if location:
@@ -105,20 +115,19 @@ class GotovkaWorker(QtCore.QThread):
 
     def run(self):
         self.log("[→] Скрипт готовки запущен.")
-
+        rage_window_missing = True
         try:
             while self._running:
                 if not CommonLogger.is_rage_mp_active():
-                    self.log("Окно RAGE Multiplayer не активно. Ожидание...")
+                    if rage_window_missing:
+                        self.log("Окно RAGE Multiplayer не активно. Ожидание...")
+                        rage_window_missing = False
                     time.sleep(1)
                     continue
 
                 found1 = self._drag_image("assets/cook/ovoshi.png", -250, 0)
-                #time.sleep(0.5)
                 found2 = self._drag_image("assets/cook/voda2.png", -250, 0)
-                #time.sleep(0.5)
                 found3 = self._drag_image("assets/cook/whisk2.png", 0, -200)
-                #time.sleep(0.5)
                 found4 = self._click_image("assets/cook/startCoocking.png")
                 time.sleep(4.5)
                 

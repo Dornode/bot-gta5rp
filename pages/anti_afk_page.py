@@ -13,15 +13,12 @@ class AntiAfkPage(QtWidgets.QWidget):
 
     def init_ui(self):
         layout = QtWidgets.QVBoxLayout(self)
-
-        label = QtWidgets.QLabel("Анти-АФК")
-        label.setStyleSheet("color: white; font-size: 16px;background: none;")
-
+        
         self.switch = SwitchButton()
         self.switch.clicked.connect(self.toggle_script)
 
         switch_layout = QtWidgets.QHBoxLayout()
-        switch_layout.addWidget(label)
+        switch_layout.addWidget(CommonLogger._make_label("Анти-АФК", 16))
         switch_layout.addStretch()
         switch_layout.addWidget(self.switch)
 
@@ -60,29 +57,20 @@ class AntiAfkPage(QtWidgets.QWidget):
         settings_layout.setSpacing(10)
         settings_layout.setContentsMargins(10, 10, 10, 10)
 
-        hold_title = QtWidgets.QLabel("Время зажатия:")
-        hold_title.setStyleSheet("color: white; font-weight: bold;background: none;")
-        settings_layout.addWidget(hold_title)
+        settings_layout.addWidget(CommonLogger._make_label("Время зажатия:", 17))
         settings_layout.addLayout(self.create_slider_row("Мин. зажатие:", self.min_delay_slider, self.min_label))
         settings_layout.addLayout(self.create_slider_row("Макс. зажатие:", self.max_delay_slider, self.max_label))
 
-        pause_title = QtWidgets.QLabel("Пауза между движениями:")
-        pause_title.setStyleSheet("color: white; font-weight: bold; margin-top: 10px;background: none;")
-        settings_layout.addWidget(pause_title)
+        settings_layout.addWidget(CommonLogger._make_label("Пауза между движениями:", 17))
         settings_layout.addLayout(self.create_slider_row("Мин. пауза:", self.min_pause_slider, self.min_pause_label))
         settings_layout.addLayout(self.create_slider_row("Макс. пауза:", self.max_pause_slider, self.max_pause_label))
         settings_group.setStyleSheet("background: none;")
         settings_group.setLayout(settings_layout)
 
-        self.log_output = QtWidgets.QTextEdit()
-        self.log_output.setReadOnly(True)
-        self.log_output.setStyleSheet("background-color: black; color: white; font-family: monospace;")
-        self.log_output.setFixedHeight(200)
-
         layout.addLayout(switch_layout)
         layout.addWidget(settings_group)
         layout.addStretch()
-        layout.addWidget(self.log_output)
+        self.log_output = CommonLogger.create_log_field(layout)
 
         self.setLayout(layout)
 

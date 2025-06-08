@@ -14,30 +14,22 @@ class ShveikaPage(QtWidgets.QWidget):
         self.worker: ShveikaWorker | None = None
         self._init_ui()
 
-    def _make_label(self, text: str, size: int) -> QtWidgets.QLabel:
-        lbl = QtWidgets.QLabel(text)
-        lbl.setStyleSheet(f"color:white;font-size:{size}px;")
-        return lbl
-
     def _init_ui(self):
         lay = QtWidgets.QVBoxLayout(self)
 
         head = QtWidgets.QHBoxLayout()
-        head.addWidget(self._make_label("Швейка Авто-Кликер", 16))
+        head.addWidget(CommonLogger._make_label("Швейка Авто-Кликер", 16))
         head.addStretch()
         self.switch = SwitchButton()
         self.switch.clicked.connect(self._toggle)
         head.addWidget(self.switch)
         lay.addLayout(head)
 
-        self.counter = self._make_label("Цикл: 0", 14)
+        self.counter = CommonLogger._make_label("Цикл: 0", 14)
         lay.addWidget(self.counter)
         lay.addStretch()
 
-        self.log_field = QtWidgets.QTextEdit(readOnly=True)
-        self.log_field.setStyleSheet("background:#000;color:#fff;font-family:monospace;")
-        self.log_field.setFixedHeight(240)
-        lay.addWidget(self.log_field)
+        self.log_field = CommonLogger.create_log_field(lay)
 
     def _toggle(self, checked: bool):
         if checked:
@@ -60,19 +52,11 @@ class ShveikaWorker(QtCore.QThread):
     counter_signal = QtCore.pyqtSignal(int)
 
     CONFIDENCE = 0.95
-    CLICK_DELAY = 0.5
-    LOOP_SLEEP = 0.5
 
     def __init__(self):
         super().__init__()
         self.running = True
         self.count = 0
-
-        try:
-            import cv2
-            self.cv2_ok = True
-        except ImportError:
-            self.cv2_ok = False
 
         base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.image_paths = [
@@ -90,10 +74,6 @@ class ShveikaWorker(QtCore.QThread):
 
 
     def run(self):
-        if not self.cv2_ok:
-            self.log("[Ошибка] OpenCV не установлен.")
-            return
-
         for path in self.image_paths:
             if not os.path.exists(path):
                 self.log(f"[Ошибка] Файл не найден: {path}")
@@ -119,7 +99,7 @@ class ShveikaWorker(QtCore.QThread):
             if all(coords):
                 self.count += 1
                 self.counter_signal.emit(self.count)
-                self.log(f"[✓] Все 20 изображений найдены. Начинаю клик.")
+                self.log(f"[✓] Все 20 точек найдены. Начинаю клик.")
                 for i, pos in enumerate(coords):
                     if not self.running:
                         break
@@ -136,7 +116,7 @@ class ShveikaWorker(QtCore.QThread):
                         pyautogui.click(pos)
                         self.log(f"[Клик] {i+1}/20: {pos} (2 раза)")
                     
-                    time.sleep(self.CLICK_DELAY)
+                    time.sleep(0.5)
             else:
                 self.log(f"[~] Ожидание всех 20 элементов...")
-            time.sleep(self.LOOP_SLEEP)
+            time.sleep(0.5)

@@ -11,7 +11,6 @@ from pages.shveika_page import ShveikaPage
 from pages.gotovka_page import GotovkaPage
 from pages.cow_page import CowPage
 
-# Стили для кнопок
 ENABLED_BUTTON_STYLE = """
 QPushButton {
     background-color: #2e2e2e;
@@ -175,7 +174,7 @@ class BotMasterApp(QtWidgets.QWidget):
         self.menu_buttons = {}
         features = [
             ("Главная", "📇", IndexPage, True),
-            ("Швейка", "👕", ShveikaPage, False),
+            ("Швейка", "👕", ShveikaPage, True),
             ("Качалка", "🏋️", IndexPage, False),
             ("Стройка|Шахта", "🚧", StroykaPage, True),
             ("Порт", "🚢", PortPage, True),
