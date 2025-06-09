@@ -30,7 +30,7 @@ class GotovkaPage(QtWidgets.QWidget):
         dish_label.setStyleSheet("color: white; font-size: 14px; background: none;")
 
         self.dish_combo = QtWidgets.QComboBox()
-        self.dish_combo.addItems(["Фруктовое смузи", "хуй"])
+        self.dish_combo.addItems(["Фруктовое смузи", "Фруктовый салат"])
         self.dish_combo.setStyle(QtWidgets.QStyleFactory.create("Fusion"))
         self.dish_combo.setStyleSheet("""
             QComboBox {
@@ -39,7 +39,6 @@ class GotovkaPage(QtWidgets.QWidget):
                 border: 1px solid #555;
                 border-radius: 4px;
                 min-width: 120px;
-                
             }
 
             QComboBox QAbstractItemView {
@@ -59,7 +58,8 @@ class GotovkaPage(QtWidgets.QWidget):
     def toggle_script(self, checked: bool):
         if checked:
             self.log_output.clear()
-            self.worker = GotovkaWorker()
+            selected_dish = self.dish_combo.currentText()
+            self.worker = GotovkaWorker(selected_dish)
             self.worker.log_signal.connect(self._append_log)
             self.worker.start()
         else:
@@ -80,9 +80,10 @@ class GotovkaPage(QtWidgets.QWidget):
 class GotovkaWorker(QtCore.QThread):
     log_signal = QtCore.pyqtSignal(str)
 
-    def __init__(self):
+    def __init__(self, dish_name: str):
         super().__init__()
         self._running = True
+        self.dish_name = dish_name
 
     def stop(self):
         self._running = False
@@ -90,32 +91,37 @@ class GotovkaWorker(QtCore.QThread):
     def log(self, message: str):
         CommonLogger.log(message, self.log_signal)
 
-    def _drag_image(self, image_path, offset_x, offset_y):
-        location = pyautogui.locateCenterOnScreen(image_path, confidence=0.85)
-        if location:
-            self.log(f"[✓] Найдено изображение: {os.path.basename(image_path)} — перемещение.")
-            pyautogui.moveTo(location.x, location.y)
-            pyautogui.mouseDown()
-            pyautogui.moveRel(offset_x, offset_y, duration=0.1)
-            pyautogui.mouseUp()
-            return True
-        else:
-            self.log(f"[×] Изображение не найдено: {os.path.basename(image_path)}.")
+    def _drag_image(self, image_path):
+        try:
+            location = pyautogui.locateCenterOnScreen(image_path, confidence=0.85)
+            if location:
+                self.log(f"[✓] Найдено изображение: {os.path.basename(image_path)}.")
+                pyautogui.rightClick(location.x, location.y)
+                #pyautogui.mouseDown()
+                #pyautogui.moveRel(offset_x, offset_y, duration=0.1)
+                #pyautogui.mouseUp()
+                #pyautogui.rightClick()
+                return True
+            return False
+        except Exception as e:
             return False
 
     def _click_image(self, image_path):
-        location = pyautogui.locateCenterOnScreen(image_path, confidence=0.85)
-        if location:
-            pyautogui.click(location)
-            self.log(f"[✓] Клик по изображению: {os.path.basename(image_path)}.")
-            return True
-        else:
-            self.log(f"[×] Изображение не найдено для клика: {os.path.basename(image_path)}.")
+        try:
+            location = pyautogui.locateCenterOnScreen(image_path, confidence=0.85)
+            if location:
+                pyautogui.click(location)
+                self.log(f"[✓] Клик по изображению: {os.path.basename(image_path)}.")
+                return True
+            return False
+        except Exception as e:
             return False
 
     def run(self):
-        self.log("[→] Скрипт готовки запущен.")
+        self.log(f"[→] Скрипт готовки запущен для блюда: {self.dish_name}")
         rage_window_missing = True
+        waiting_for_images = False
+        
         try:
             while self._running:
                 if not CommonLogger.is_rage_mp_active():
@@ -125,20 +131,43 @@ class GotovkaWorker(QtCore.QThread):
                     time.sleep(1)
                     continue
 
-                found1 = self._drag_image("assets/cook/ovoshi.png", -250, 0)
-                found2 = self._drag_image("assets/cook/voda2.png", -250, 0)
-                found3 = self._drag_image("assets/cook/whisk2.png", 0, -200)
-                found4 = self._click_image("assets/cook/startCoocking.png")
-                time.sleep(4.5)
-                
-                if found1 and found2 and found3 and found4:
-                    self.log("[✓] Операция готовки завершена.")
-                else:
-                    self.log("[!] Ожидание появления всех элементов...")
+                try:
+                    all_found = False
+                    
+                    if self.dish_name == "Фруктовое смузи":
+                        found1 = self._drag_image("assets/cook/ovoshi.png")
+                        found2 = self._drag_image("assets/cook/voda2.png")
+                        found3 = self._drag_image("assets/cook/whisk2.png")
+                        found4 = self._click_image("assets/cook/startCoocking.png")
+                        
+                        all_found = found1 and found2 and found3 and found4
+                        
+                    elif self.dish_name == "Фруктовый салат":
+                        found1 = self._drag_image("assets/cook/frukti.png")
+                        found2 = self._drag_image("assets/cook/knife2.png")
+                        found3 = self._click_image("assets/cook/startCoocking.png")
+                        
+                        all_found = found1 and found2 and found3
 
-                time.sleep(1.0)
+                    if all_found:
+                        waiting_for_images = False
+                        self.log("[✓] Операция готовки завершена. Начинаем новую...")
+                        time.sleep(5.5)
+                    else:
+                        if not waiting_for_images:
+                            self.log("[!] Ожидание появления всех элементов...")
+                            waiting_for_images = True
+                        time.sleep(1.0)
+
+                except Exception as e:
+                    if not waiting_for_images:
+                        self.log(f"[!] Временная ошибка: {str(e)}")
+                        waiting_for_images = True
+                    time.sleep(1.0)
+                    continue
 
         except Exception as e:
             self.log(f"[Ошибка] {e}")
         finally:
-            self.log("[■] Скрипт готовки завершён.")
+            if self._running:
+                self.log("[■] Скрипт готовки завершён.")
