@@ -30,7 +30,7 @@ class GotovkaPage(QtWidgets.QWidget):
         dish_label.setStyleSheet("color: white; font-size: 14px; background: none;")
 
         self.dish_combo = QtWidgets.QComboBox()
-        self.dish_combo.addItems(["Фруктовое смузи", "Фруктовый салат"])
+        self.dish_combo.addItems(["Фруктовый смузи", "Фруктовый салат", "Овощной салат", "Овощной смузи"])
         self.dish_combo.setStyle(QtWidgets.QStyleFactory.create("Fusion"))
         self.dish_combo.setStyleSheet("""
             QComboBox {
@@ -97,10 +97,6 @@ class GotovkaWorker(QtCore.QThread):
             if location:
                 self.log(f"[✓] Найдено изображение: {os.path.basename(image_path)}.")
                 pyautogui.rightClick(location.x, location.y)
-                #pyautogui.mouseDown()
-                #pyautogui.moveRel(offset_x, offset_y, duration=0.1)
-                #pyautogui.mouseUp()
-                #pyautogui.rightClick()
                 return True
             return False
         except Exception as e:
@@ -117,6 +113,59 @@ class GotovkaWorker(QtCore.QThread):
         except Exception as e:
             return False
 
+    def _find_all_required_images(self):
+        """Проверяет наличие всех необходимых изображений для текущего блюда"""
+        required_images = []
+        
+        if self.dish_name == "Фруктовый смузи":
+            required_images = [
+                ("assets/cook/frukti.png", self._drag_image),
+                ("assets/cook/voda2.png", self._drag_image),
+                ("assets/cook/whisk2.png", self._drag_image),
+                ("assets/cook/startCoocking.png", self._click_image)
+            ]
+        elif self.dish_name == "Фруктовый салат":
+            required_images = [
+                ("assets/cook/frukti.png", self._drag_image),
+                ("assets/cook/knife2.png", self._drag_image),
+                ("assets/cook/startCoocking.png", self._click_image)
+            ]
+        elif self.dish_name == "Овощной салат":
+            required_images = [
+                ("assets/cook/ovoshi.png", self._drag_image),
+                ("assets/cook/knife2.png", self._drag_image),
+                ("assets/cook/startCoocking.png", self._click_image)
+            ]
+        elif self.dish_name == "Овощной смузи":
+            required_images = [
+                ("assets/cook/ovoshi.png", self._drag_image),
+                ("assets/cook/voda2.png", self._drag_image),
+                ("assets/cook/whisk2.png", self._drag_image),
+                ("assets/cook/startCoocking.png", self._click_image)
+            ]
+
+        # Проверяем все изображения
+        all_found = True
+        for img_path, action in required_images:
+            try:
+                location = pyautogui.locateCenterOnScreen(img_path, confidence=0.85)
+                if not location:
+                    all_found = False
+                    break
+            except:
+                all_found = False
+                break
+                
+        if not all_found:
+            return False
+            
+        # Если все изображения найдены, выполняем действия
+        for img_path, action in required_images:
+            if not action(img_path):
+                return False
+                
+        return True
+
     def run(self):
         self.log(f"[→] Скрипт готовки запущен для блюда: {self.dish_name}")
         rage_window_missing = True
@@ -132,24 +181,7 @@ class GotovkaWorker(QtCore.QThread):
                     continue
 
                 try:
-                    all_found = False
-                    
-                    if self.dish_name == "Фруктовое смузи":
-                        found1 = self._drag_image("assets/cook/ovoshi.png")
-                        found2 = self._drag_image("assets/cook/voda2.png")
-                        found3 = self._drag_image("assets/cook/whisk2.png")
-                        found4 = self._click_image("assets/cook/startCoocking.png")
-                        
-                        all_found = found1 and found2 and found3 and found4
-                        
-                    elif self.dish_name == "Фруктовый салат":
-                        found1 = self._drag_image("assets/cook/frukti.png")
-                        found2 = self._drag_image("assets/cook/knife2.png")
-                        found3 = self._click_image("assets/cook/startCoocking.png")
-                        
-                        all_found = found1 and found2 and found3
-
-                    if all_found:
+                    if self._find_all_required_images():
                         waiting_for_images = False
                         self.log("[✓] Операция готовки завершена. Начинаем новую...")
                         time.sleep(5.5)
