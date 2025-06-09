@@ -3,8 +3,8 @@ from widgets.switch_button import SwitchButton
 import time
 import keyboard
 import pyautogui
-import os
-import pygetwindow as gw
+from widgets.logger import CommonLogger
+
 
 class CowPage(QtWidgets.QWidget):
     def __init__(self):
@@ -16,29 +16,42 @@ class CowPage(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout(self)
 
         switch_layout = QtWidgets.QHBoxLayout()
-        label = QtWidgets.QLabel("Авто‑Коровы")
-        label.setStyleSheet("color: white; font-size: 16px;background: none;")
         self.switch = SwitchButton()
         self.switch.clicked.connect(self.toggle_script)
 
-        switch_layout.addWidget(label)
+        switch_layout.addWidget(CommonLogger._make_label("Коровы", 16))
         switch_layout.addStretch()
         switch_layout.addWidget(self.switch)
         layout.addLayout(switch_layout)
 
+        hotkey_layout = QtWidgets.QHBoxLayout()
+        self.hotkey_input = QtWidgets.QLineEdit("f6")
+        self.hotkey_input.setMaxLength(20)
+        self.hotkey_input.setFixedWidth(100)
+        self.hotkey_input.setStyleSheet("background-color: #222; color: white;")
+
+        hotkey_layout.addWidget(CommonLogger._make_label("Горячая клавиша:", 14))
+        hotkey_layout.addWidget(self.hotkey_input)
+        hotkey_layout.addStretch()
+        layout.addLayout(hotkey_layout)
+
+        hotkey_description = QtWidgets.QLabel("— вкл/выкл скрипта")
+        hotkey_description.setStyleSheet("color: white; font-size: 12px; padding-right:150px;background: none;")
+        hotkey_layout.addWidget(hotkey_description)
+
+        self.counter_label = QtWidgets.QLabel("Счётчик: 0")
+        self.counter_label.setStyleSheet("color: white; font-size: 14px;background: none;")
+        layout.addWidget(self.counter_label)
         layout.addStretch()
 
-        self.log_output = QtWidgets.QTextEdit()
-        self.log_output.setReadOnly(True)
-        self.log_output.setStyleSheet("background-color: black; color: white; font-family: monospace;")
-        self.log_output.setFixedHeight(200)
-        layout.addWidget(self.log_output)
+        self.log_output = CommonLogger.create_log_field(layout)
 
     def toggle_script(self, checked: bool):
         if checked:
             self.log_output.clear()
-            self.worker = CowWorker()
+            self.worker = CowWorker(self.hotkey_input.text())
             self.worker.log_signal.connect(self._append_log)
+            self.worker.counter_signal.connect(self._update_counter)
             self.worker.start()
         else:
             self._stop_worker()
@@ -54,94 +67,107 @@ class CowPage(QtWidgets.QWidget):
     def _append_log(self, text: str):
         self.log_output.append(text)
 
+    def _update_counter(self, value: int):
+        self.counter_label.setText(f"Счётчик: {value}")
+
 
 class CowWorker(QtCore.QThread):
     log_signal = QtCore.pyqtSignal(str)
+    counter_signal = QtCore.pyqtSignal(int)
 
-    def __init__(self):
+    def __init__(self, hotkey: str = "f6"):
         super().__init__()
         self._running = True
+        self._count = 0
+        self._active = False
+        self._toggle_requested = False
+        self.hotkey = hotkey.lower().strip() or "f6"
+
+        try:
+            keyboard.add_hotkey(self.hotkey, self._request_toggle)
+        except Exception as e:
+            self.log(f"[!] Ошибка при назначении горячей клавиши '{self.hotkey}': {str(e)}")
+
+    def log(self, message: str):
+        CommonLogger.log(message, self.log_signal)
 
     def stop(self):
         self._running = False
+        keyboard.unhook_all_hotkeys()
+        self._active = False
+        self.log("[■] Скрипт остановлен")
 
-    def log(self, message: str):
-        timestamp = time.strftime("[%H:%M:%S]")
-        full_message = f"{timestamp} {message}"
-        try:
-            with open("logs.txt", "a", encoding="utf-8") as fp:
-                fp.write(full_message + "\n")
-        except OSError:
-            pass
-        self.log_signal.emit(full_message)
-
-    def _image_visible(self, filename: str, confidence: float = 0.95) -> bool:
-        try:
-            return pyautogui.locateOnScreen(filename, confidence=confidence) is not None
-        except Exception as e:
-            self.log(f"[Ошибка] Не удалось найти {filename}: {e}")
-            return False
-
-    def _pixel_color_visible(self, target_rgb: tuple[int, int, int], tolerance: int = 10) -> bool:
-        try:
-            screenshot = pyautogui.screenshot()
-            width, height = screenshot.size
-            pixels = screenshot.load()
-
-            for y in range(0, height, 10):  # шаг 10 пикселей по вертикали
-                for x in range(0, width, 10):  # шаг 10 пикселей по горизонтали
-                    r, g, b = pixels[x, y]
-                    if (
-                        abs(r - target_rgb[0]) <= tolerance and
-                        abs(g - target_rgb[1]) <= tolerance and
-                        abs(b - target_rgb[2]) <= tolerance
-                    ):
-                        return True
-            return False
-        except Exception as e:
-            self.log(f"[Ошибка] Не удалось просканировать экран на цвет: {e}")
-            return False
-
-    @staticmethod
-    def _is_rage_mp_active() -> bool:
-        active = gw.getActiveWindow()
-        if not active:
-            return False
-        replacements = {
-            "а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "у": "y", "х": "x",
-            "м": "m", "т": "t", "н": "h", "в": "b", "к": "k",
-        }
-        normalized = "".join(replacements.get(ch, ch) for ch in active.title.casefold())
-        return "multi" in normalized
+    def _request_toggle(self):
+        self._toggle_requested = True
 
     def run(self):
-        self.log("Скрипт коровы запущен (быстрый режим)")
+        self.log("Скрипт коров запущен. Нажми ESC для остановки или используй переключатель.")
+        rage_logged = False
 
-        while self._running:
-            # Быстрая проверка активности окна RAGE
-            if not self._is_rage_mp_active():
-                time.sleep(0.5)  # Короткая пауза, если окно не активно
-                continue
+        try:
+            while self._running:
+                # Проверка окна
+                try:
+                    if not CommonLogger.is_rage_mp_active():
+                        if self._active:
+                            self._active = False
+                            self.log("[■] Скрипт приостановлен (RAGE не активно)")
+                        if not rage_logged:
+                            self.log("Окно RAGE Multiplayer не активно. Ожидание...")
+                            rage_logged = True
+                        time.sleep(1.0)
+                        continue
+                    else:
+                        if rage_logged:
+                            self.log("Окно RAGE Multiplayer найдено.")
+                            rage_logged = False
+                except Exception as e:
+                    self.log(f"[!] Ошибка при проверке окна RAGE: {e}")
+                    time.sleep(1.0)
+                    continue
 
-            # Ускоренная проверка A и D (без лишних задержек)
-            a_visible = self._image_visible("assets/cow/aForCow.png")
-            d_visible = self._image_visible("assets/cow/dForCow.png")
+                # ESC для выхода
+                if keyboard.is_pressed("esc"):
+                    self.log("Получен ESC. Останавливаемся...")
+                    self.stop()
+                    break
 
-            if a_visible:
-                #keyboard.press("a")
-                keyboard.release("a")  # Максимально быстрое нажатие
-                self.log("НАЖАЛ A")
-                time.sleep(0.1)  # Минимальная задержка
-            elif d_visible:
-                #keyboard.press("d")
-                keyboard.release("d")
-                self.log("НАЖАЛ d")
-                time.sleep(0.1)
-            else:
-                # Если ничего не найдено — жмём E очень быстро
-                keyboard.press("e")
-                keyboard.release("e")
-                time.sleep(0.1)  # Чуть больше, чтобы игра успела обработать
+                # Переключение скрипта
+                if self._toggle_requested:
+                    self._active = not self._active
+                    self.log(f"[→] Скрипт {'активирован' if self._active else 'деактивирован'}")
+                    self._toggle_requested = False
 
+                if not self._active:
+                    time.sleep(0.1)
+                    continue
 
-        self.log("Скрипт коровы завершён")
+                # Поиск A и D с высоким confidence
+                try:
+                    a_pos = pyautogui.locateOnScreen('assets/cow/a.png', confidence=0.99)
+                    if a_pos:
+                        keyboard.send('a')
+                        self._count += 1
+                        self.log(f"[A] Найдена A - нажата (#{self._count})")
+                        self.counter_signal.emit(self._count)
+                        # pyautogui.screenshot("debug_a.png", region=a_pos)  # <- Включи, если нужно
+                        time.sleep(0.3)
+
+                    d_pos = pyautogui.locateOnScreen('assets/cow/d.png', confidence=0.99)
+                    if d_pos:
+                        keyboard.send('d')
+                        self._count += 1
+                        self.log(f"[D] Найдена D - нажата (#{self._count})")
+                        self.counter_signal.emit(self._count)
+                        # pyautogui.screenshot("debug_d.png", region=d_pos)  # <- Включи, если нужно
+                        time.sleep(0.3)
+
+                except Exception as e:
+                    self.log(f"[!] Ошибка поиска изображений: {str(e)}")
+                    time.sleep(1.0)
+
+                time.sleep(0.05)
+
+        except Exception as exc:
+            self.log(f"[Ошибка потока] {exc}")
+            self.stop()
